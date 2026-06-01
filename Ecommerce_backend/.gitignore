@@ -1,0 +1,57 @@
+# ==========================================
+# 1. PYTHON CORE & CACHE
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# ==========================================
+# 2. VIRTUAL ENVIRONMENT & SECRETS
+# ==========================================
+venv/
+.venv/
+env/
+.env
+.env.*
+!.env.example
+
+# ==========================================
+# 3. FASTAPI, LOGS & TESTING
+# ==========================================
+*.log
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# ==========================================
+# 4. DATABASE & DOCKER LOCAL VOLUMES
+# ==========================================
+# Bỏ qua các file DB local (nếu test) và thư mục mount data của Docker (tránh push rác DB lên Git)
+*.sqlite3
+postgres_data/
+redis_data/
+es_data/
+
+# ==========================================
+# 5. IDE & OS SYSTEM FILES
+# ==========================================
+# VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# PyCharm/JetBrains
+.idea/
+
+# macOS / Windows
+.DS_Store
+Thumbs.db
+
+# Ruff / Mypy (Công cụ check code quality)
+.ruff_cache/
+.mypy_cache/
