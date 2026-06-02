@@ -51,7 +51,7 @@ es_data/
 # macOS / Windows
 .DS_Store
 Thumbs.db
-
+*.ps1
 # Ruff / Mypy (Công cụ check code quality)
 .ruff_cache/
 .mypy_cache/
