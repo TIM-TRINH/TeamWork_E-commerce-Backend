@@ -1,0 +1,19 @@
+# Web Framework & Server
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+
+# Data Validation & Config
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
+
+# Database ORM & Migration
+sqlalchemy==2.0.29
+alembic==1.13.1
+psycopg[binary]==3.3.4
+
+# Authentication & Security (JWT, bcrypt)
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+
+# Caching & Background
+redis==5.0.3
