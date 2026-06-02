@@ -1,0 +1,1 @@
+chạy lệnh: .\venv\Scripts\activate mỗi khi test project trên môi trường ảo tránh chạy trên máy.
