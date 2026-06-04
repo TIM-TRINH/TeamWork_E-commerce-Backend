@@ -6,6 +6,8 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.core.exceptions import BusinessRuleException, business_rule_exception_handler
 from app.modules.auth.router import router as auth_router
+from app.modules.order.router import router as order_router
+from app.modules.product.router import router as product_router
 
 def create_app() -> FastAPI:
     """
@@ -22,6 +24,8 @@ def create_app() -> FastAPI:
 
     # TODO: Import và include routers tại đây
     app.include_router(auth_router, prefix="/v1/auth", tags=["Auth"])
+    app.include_router(order_router, prefix="/v1/order", tags=["Order"])
+    app.include_router(product_router, prefix="/v1/product", tags=["Product"])
 
     # Base URL /v1 cho health check
     @app.get("/v1/health", tags=["Health"])

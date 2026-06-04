@@ -9,3 +9,7 @@
 
 # # Hoặc chạy nền:
 # docker-compose up -d
+
+# tắt tạm giới hạn của máy tính trường để chạy venv
+# Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
+
