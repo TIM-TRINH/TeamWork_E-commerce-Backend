@@ -31,3 +31,7 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    
+# Schema cho Request đổi token mới bằng refresh token
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str = Field(..., description="Refresh token hợp lệ để đổi token mới")
