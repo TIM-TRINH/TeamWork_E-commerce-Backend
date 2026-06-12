@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, ConfigDict
 from uuid import UUID
 from typing import List, Optional
+from datetime import datetime
 
 class ProductBase(BaseModel):
     name: str = Field(..., max_length=200)
@@ -10,18 +11,32 @@ class ProductBase(BaseModel):
     category_id: UUID
     images: List[str]
 
-# Schema cho Response
+# 1. Schema cho Admin lúc Tạo/Sửa (Cần số lượng stock cụ thể)
+class ProductCreate(ProductBase):
+    stock: int = Field(..., ge=0, description="Số lượng tồn kho chính xác")
+
+class ProductUpdate(BaseModel):
+    # Tất cả đều Optional
+    name: Optional[str] = Field(None, max_length=200)
+    price: Optional[int] = Field(None, gt=0)
+    stock: Optional[int] = Field(None, ge=0)
+    # ... (các trường khác)
+
+# 2. Schema cho Response trả về Client
 class ProductResponse(ProductBase):
     product_id: UUID
-    in_stock: bool # Theo spec, user chỉ thấy boolean này
+    in_stock: bool # Client chỉ thấy True/False
     rating: Optional[float] = None
+    created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
 
-# Schema chuẩn hóa Query Parameters cho API GET /v1/products
+# 3. Schema chuẩn hóa Query Parameters (Cursor Pagination)
 class ProductQueryParams(BaseModel):
-    page: int = Field(1, ge=1)
-    limit: int = Field(20, le=100)
+    # BỎ trường page, thay bằng cursor
+    cursor: Optional[datetime] = Field(None, description="Truyền created_at của item cuối cùng ở lần fetch trước")
+    limit: int = Field(20, gt=0, le=100)
+    
     category_id: Optional[UUID] = None
     q: Optional[str] = None
     sort: Optional[str] = Field(None, pattern="^(price_asc|price_desc|newest|popular)$")

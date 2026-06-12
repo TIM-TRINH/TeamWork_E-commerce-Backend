@@ -4,24 +4,15 @@ from typing import List
 from uuid import UUID
 
 from app.modules.order import schemas, services
-# Giả định bạn đã có dependency lấy DB session và User hiện tại
 from app.db.database import get_db_session
-# from app.core.security import get_current_user
+from app.core.exceptions import BusinessRuleException
+from app.modules.auth.dependencies import get_current_user, get_current_admin
 
 router = APIRouter(
     prefix="/orders",
     tags=["Orders"],
     responses={404: {"description": "Not found"}},
 )
-
-# --- Mock Auth Dependency (Để code chạy được khi bạn chưa hoàn thiện module Auth) ---
-class MockUser:
-    import uuid
-    id: UUID = uuid.UUID("11111111-1111-1111-1111-111111111111")
-
-def get_current_user():
-    return MockUser()
-# -----------------------------------------------------------------------------------
 
 @router.post("/", response_model=schemas.OrderResponse, status_code=status.HTTP_201_CREATED)
 def place_order(
@@ -30,7 +21,9 @@ def place_order(
     current_user = Depends(get_current_user)
 ):
     """Tạo đơn hàng mới (Checkout)."""
-    return services.create_order(db=db, user_id=current_user.id, order_create=order_in)
+    # LƯU Ý: Đảm bảo model User của bạn dùng trường khóa chính là user_id (không phải id)
+    return services.create_order(db=db, user_id=current_user.user_id, order_create=order_in)
+
 
 @router.get("/", response_model=List[schemas.OrderResponse])
 def list_my_orders(
@@ -38,7 +31,8 @@ def list_my_orders(
     current_user = Depends(get_current_user)
 ):
     """Lấy danh sách đơn hàng của user đang đăng nhập."""
-    return services.get_orders(db=db, user_id=current_user.id)
+    return services.get_orders(db=db, user_id=current_user.user_id)
+
 
 @router.get("/{order_id}", response_model=schemas.OrderResponse)
 def get_order_detail(
@@ -47,15 +41,26 @@ def get_order_detail(
     current_user = Depends(get_current_user)
 ):
     """Lấy chi tiết một đơn hàng theo ID."""
-    # LƯU Ý: Ở production cần kiểm tra xem order này có thuộc về current_user không!
-    return services.get_order_by_id(db=db, order_id=order_id)
+    order = services.get_order_by_id(db=db, order_id=order_id)
+    
+    # BẢO MẬT CHỐNG IDOR: Chỉ cho phép chủ nhân đơn hàng hoặc Admin được xem
+    if order.user_id != current_user.user_id and current_user.role != "admin":
+        raise BusinessRuleException(
+            message="Bạn không có quyền truy cập đơn hàng này",
+            error_code="FORBIDDEN",
+            status_code=status.HTTP_403_FORBIDDEN
+        )
+        
+    return order
+
 
 @router.patch("/{order_id}/status", response_model=schemas.OrderResponse)
 def update_status(
     status_in: schemas.OrderStatusUpdate,
     order_id: UUID = Path(...),
     db: Session = Depends(get_db_session),
-    # current_user = Depends(get_current_admin) # Chỉ Admin mới được đổi status
+    # BẬT PHÂN QUYỀN: Chỉ Admin mới được phép đổi trạng thái
+    current_admin = Depends(get_current_admin) 
 ):
     """Cập nhật trạng thái đơn hàng (Dành cho Admin)."""
     return services.update_order_status(db=db, order_id=order_id, status_update=status_in)

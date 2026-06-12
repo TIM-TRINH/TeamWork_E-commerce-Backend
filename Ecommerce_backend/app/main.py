@@ -5,11 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware # [BỔ SUNG] Import CORS
 from app.core.config import settings
 from app.core.exceptions import BusinessRuleException, business_rule_exception_handler
 from app.modules.auth.router import router as auth_router
-
-# Chú ý: Nếu module Product và Order chưa code xong router, 
-# bạn cần comment lại để app không bị crash khi khởi động.
-# from app.modules.order.router import router as order_router
-# from app.modules.product.router import router as product_router
+from app.modules.order.router import router as order_router
+from app.modules.product.router import router as product_router
 
 def create_app() -> FastAPI:
     """
@@ -35,10 +32,8 @@ def create_app() -> FastAPI:
 
     # 3. Import routers (Không truyền prefix ở đây vì đã khai báo sẵn trong từng router.py)
     app.include_router(auth_router)
-    
-    # Bỏ comment khi các module sau hoàn thiện:
-    # app.include_router(order_router)
-    # app.include_router(product_router)
+    app.include_router(order_router)
+    app.include_router(product_router)
 
     # 4. Health Check Endpoint
     @app.get("/v1/health", tags=["Health"])

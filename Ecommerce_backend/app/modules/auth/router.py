@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
+from app.modules.auth.dependencies import get_current_user
 from app.db.database import get_db_session
 from app.modules.auth import schemas, services
 from app.core import security
@@ -44,21 +45,11 @@ def login(
 
 
 @router.get("/me", response_model=schemas.UserResponse)
-def get_me(
-    token: str = Depends(oauth2_scheme), # FastAPI tự bóc Header Authorization ra cho bạn
-    db: Session = Depends(get_db_session)
-):
+def get_me(current_user = Depends(get_current_user)):
     """Lấy thông tin user đang đăng nhập."""
-    user_id = security.verify_token(token)
-    if not user_id:
-        # Ném lỗi với mã 401 Unauthorized khi token không hợp lệ hoặc hết hạn
-        raise BusinessRuleException(
-            message="Token không hợp lệ hoặc đã hết hạn", 
-            error_code="INVALID_TOKEN",
-            status_code=status.HTTP_401_UNAUTHORIZED 
-        )
-    
-    return services.get_user_by_id(db, user_id)
+    # FastAPI sẽ tự động chạy hàm get_current_user, giải mã token, 
+    # lấy user từ DB và ném thẳng vào biến current_user này.
+    return current_user
 
 # Bổ sung API xoay vòng token (Token Rotation) theo spec
 @router.post("/refresh-token", response_model=schemas.TokenResponse, status_code=status.HTTP_200_OK)
