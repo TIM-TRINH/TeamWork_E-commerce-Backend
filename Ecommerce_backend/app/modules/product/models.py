@@ -36,11 +36,12 @@ class Product(Base):
     price = Column(Integer, nullable=False, index=True)  # Lưu giá trị VND dạng số nguyên
     currency = Column(String(10), default="VND", nullable=False)
     stock = Column(Integer, default=0, nullable=False)
-    images = Column(ARRAY(String), nullable=False, default=[]) # Lưu danh sách URL hình ảnh (PostgreSQL specific)
+    images = Column(ARRAY(String), nullable=False, default=[]) # Lưu danh sách URL hình ảnh
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.category_id", ondelete="RESTRICT"), nullable=False)
     
-    created_at = Column(Column(DateTime(timezone=True), server_default=func.now(), index=True))
-    updated_at = Column(Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now()))
+    # [ĐÃ SỬA LỖI] Xóa bỏ Column() lồng nhau
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     category = relationship("Category", back_populates="products")
 
@@ -48,6 +49,5 @@ class Product(Base):
     def in_stock(self) -> bool:
         """
         Động toán trạng thái còn hàng/hết hàng dựa trên stock thực tế.
-        Giúp Pydantic tự động map vào trường 'in_stock' của ProductResponse.
         """
         return self.stock > 0
