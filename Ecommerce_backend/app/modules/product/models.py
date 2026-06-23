@@ -10,7 +10,6 @@ class Category(Base):
     Model quản lý danh mục sản phẩm.
     Hỗ trợ cấu trúc cây thư mục đa cấp (Self-referential relationship) đáp ứng Max Depth = 3.
     """
-    __tablename__ = "categories"
 
     category_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
@@ -39,15 +38,11 @@ class Product(Base):
     images = Column(ARRAY(String), nullable=False, default=[]) # Lưu danh sách URL hình ảnh
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.category_id", ondelete="RESTRICT"), nullable=False)
     
-    # [ĐÃ SỬA LỖI] Xóa bỏ Column() lồng nhau
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
     category = relationship("Category", back_populates="products")
 
     @property
     def in_stock(self) -> bool:
         """
-        Động toán trạng thái còn hàng/hết hàng dựa trên stock thực tế.
+        Tự động check trạng thái còn hàng/hết hàng dựa trên stock thực tế.
         """
         return self.stock > 0

@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any
 from uuid import UUID
 from app.core.config import settings
 
-# 1. Cấu hình bcrypt bắt buộc cost = 12 theo spec
+# 1. Cấu hình bcrypt với cost = 12 (Chuẩn bảo mật hiện tại)
 pwd_context = CryptContext(
     schemes=["bcrypt"], 
     deprecated="auto",
@@ -18,40 +18,52 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
-# 2. JWT Token Generator linh hoạt cho cả Access và Refresh Token
+# 2. JWT Token Generator linh hoạt
 def create_jwt_token(data: Dict[str, Any], expires_delta: timedelta) -> str:
     """
-    Tạo token dựa trên payload truyền vào. Payload truyền từ service phải chứa đủ: user_id, email, role.
+    Tạo token dựa trên payload. Payload nên chứa: user_id, email, role.
     """
     to_encode = data.copy()
+    
+    # [QUAN TRỌNG]: Ép kiểu UUID thành chuỗi (str) để tránh lỗi JSON Encode
+    if "user_id" in to_encode and isinstance(to_encode["user_id"], UUID):
+        to_encode["user_id"] = str(to_encode["user_id"])
+
     now = datetime.now(timezone.utc)
     expire = now + expires_delta
     
-    # Bổ sung thời gian tạo (iat) và thời gian hết hạn (exp) theo spec
     to_encode.update({
         "iat": now,
         "exp": expire
     })
     
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
+    # Trích xuất chuỗi bí mật thực sự từ Pydantic v2 SecretStr
+    secret_key = settings.SECRET_KEY.get_secret_value()
+    
+    encoded_jwt = jwt.encode(to_encode, secret_key, algorithm="HS256")
     return encoded_jwt
 
-# 3. Hàm tạo nhanh Access Token (15 phút) và Refresh Token (7 ngày)
+# 3. Hàm tạo nhanh Tokens
 def create_access_token(data: Dict[str, Any]) -> str:
     return create_jwt_token(data, expires_delta=timedelta(minutes=15))
 
 def create_refresh_token(data: Dict[str, Any]) -> str:
     return create_jwt_token(data, expires_delta=timedelta(days=7))
 
-# 4. Verify token trả về UUID chuẩn xác
+# 4. Verify token trả về UUID
 def verify_token(token: str) -> Optional[UUID]:
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-        # Đọc theo key 'user_id' thay vì 'sub'
+        # Nhớ trích xuất secret_key khi decode
+        secret_key = settings.SECRET_KEY.get_secret_value()
+        
+        payload = jwt.decode(token, secret_key, algorithms=["HS256"])
+        
         user_id_str = payload.get("user_id") 
-        if user_id_str is None:
+        if not user_id_str:
             return None
-        return UUID(user_id_str) # Trả về chuẩn đối tượng UUID v4
+            
+        return UUID(str(user_id_str)) # Trả về chuẩn đối tượng UUID v4
     except (JWTError, ValueError):
-        # ValueError bắt lỗi nếu chuỗi user_id không phải là UUID hợp lệ
+        # JWTError: Token sai chữ ký hoặc đã hết hạn
+        # ValueError: UUID format không hợp lệ
         return None

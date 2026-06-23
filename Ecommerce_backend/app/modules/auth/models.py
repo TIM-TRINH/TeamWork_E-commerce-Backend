@@ -9,8 +9,7 @@ class User(Base):
     Model đại diện cho bảng users trong cơ sở dữ liệu.
     Lưu trữ thông tin xác thực và phân quyền của người dùng.
     """
-    __tablename__ = "users"
-
+    
     # Sử dụng UUID v4 làm khóa chính theo chuẩn spec
     user_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     
@@ -19,7 +18,4 @@ class User(Base):
     name = Column(String(100), nullable=False)
     role = Column(String(20), default="customer", nullable=False)
     verified = Column(Boolean, default=False, nullable=False)
-    
-    # Best Practice: Luôn lưu thời gian dưới chuẩn UTC (ISO 8601)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
