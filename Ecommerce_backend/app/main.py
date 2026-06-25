@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware # [BỔ SUNG] Import CORS
 
-# Import Settings và Exception từ core
 from app.core.config import settings
 from app.core.exceptions import BusinessRuleException, business_rule_exception_handler
 from app.modules.auth.router import router as auth_router

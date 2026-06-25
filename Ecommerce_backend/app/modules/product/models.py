@@ -1,48 +1,49 @@
 import uuid
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from app.db.base_class import Base
+from sqlalchemy import String, Integer, ForeignKey
+from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.base_class import Base 
 
 class Category(Base):
-    """
-    Model quản lý danh mục sản phẩm.
-    Hỗ trợ cấu trúc cây thư mục đa cấp (Self-referential relationship) đáp ứng Max Depth = 3.
-    """
-
-    category_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(255), nullable=False)
-    slug = Column(String(255), nullable=False, unique=True, index=True)
-    parent_id = Column(UUID(as_uuid=True), ForeignKey("categories.category_id", ondelete="SET NULL"), nullable=True)
-
-    # Mối quan hệ tự tham chiếu (Self-referential) để tạo cây danh mục
-    parent = relationship("Category", remote_side=[category_id], back_populates="children")
-    children = relationship("Category", back_populates="parent", cascade="all, delete-orphan")
+    """Model quản lý danh mục. Tự động có created_at và updated_at từ Base."""
     
-    products = relationship("Product", back_populates="category")
+    # Ghi đè tự động hóa của Base để ép tên bảng thành SỐ NHIỀU
+    __tablename__ = "categories"  
+
+    category_id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("categories.category_id", ondelete="SET NULL")
+    )
+
+    parent: Mapped["Category"] = relationship("Category", remote_side=[category_id], back_populates="children")
+    children: Mapped[list["Category"]] = relationship("Category", back_populates="parent", cascade="all, delete-orphan")
+    products: Mapped[list["Product"]] = relationship("Product", back_populates="category")
 
 
 class Product(Base):
-    """
-    Model quản lý thông tin sản phẩm cốt lõi.
-    """
-    __tablename__ = "products"
-
-    product_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(255), nullable=False, index=True)
-    description = Column(String(2000), nullable=True)
-    price = Column(Integer, nullable=False, index=True)  # Lưu giá trị VND dạng số nguyên
-    currency = Column(String(10), default="VND", nullable=False)
-    stock = Column(Integer, default=0, nullable=False)
-    images = Column(ARRAY(String), nullable=False, default=[]) # Lưu danh sách URL hình ảnh
-    category_id = Column(UUID(as_uuid=True), ForeignKey("categories.category_id", ondelete="RESTRICT"), nullable=False)
+    """Model quản lý sản phẩm. Tự động có created_at và updated_at từ Base."""
     
-    category = relationship("Category", back_populates="products")
+    # Ghi đè tự động hóa của Base để ép tên bảng thành SỐ NHIỀU
+    __tablename__ = "products"  
+
+    product_id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    description: Mapped[str | None] = mapped_column(String(2000))
+    price: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    currency: Mapped[str] = mapped_column(String(10), default="VND", nullable=False)
+    stock: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    images: Mapped[list[str]] = mapped_column(ARRAY(String), default=[])
+    
+    category_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("categories.category_id", ondelete="RESTRICT")
+    )
+    
+    category: Mapped["Category"] = relationship("Category", back_populates="products")
 
     @property
     def in_stock(self) -> bool:
-        """
-        Tự động check trạng thái còn hàng/hết hàng dựa trên stock thực tế.
-        """
         return self.stock > 0

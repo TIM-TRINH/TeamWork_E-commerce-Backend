@@ -7,6 +7,10 @@ import uuid
 from app.db.base_class import Base
 
 class Order(Base):
+    """Model quản lý đơn hàng tổng."""
+    
+    # Ép tên bảng thành số nhiều
+    __tablename__ = "orders"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), nullable=False) # FK to users
@@ -16,7 +20,11 @@ class Order(Base):
     items = relationship("OrderItem", back_populates="order")
 
 class OrderItem(Base):
-
+    """Model quản lý chi tiết từng sản phẩm trong một đơn hàng."""
+    
+    # Bảng trung gian/chi tiết cũng PHẢI là số nhiều (cách nhau bởi dấu gạch dưới)
+    __tablename__ = "order_items"
+    
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id"))
     product_id = Column(UUID(as_uuid=True), nullable=False) # FK to products

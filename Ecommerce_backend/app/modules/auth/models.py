@@ -9,7 +9,7 @@ class User(Base):
     Model đại diện cho bảng users trong cơ sở dữ liệu.
     Lưu trữ thông tin xác thực và phân quyền của người dùng.
     """
-    
+    __tablename__ = "users"
     # Sử dụng UUID v4 làm khóa chính theo chuẩn spec
     user_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     
