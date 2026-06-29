@@ -2,25 +2,18 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import List
 from app.modules.order.models import Order, OrderItem
-from app.modules.order.schemas import OrderCreate, OrderStatusUpdate
+from app.modules.order.schemas import OrderCreate, OrderStatusUpdate, OrderStatusEnum
 from app.modules.product.models import Product
 from app.core.exceptions import BusinessRuleException
 from enum import Enum
 
-class OrderStatus(str, Enum):
-    PENDING = "pending"
-    PROCESSING = "processing"
-    SHIPPED = "shipped"
-    DELIVERED = "delivered"
-    CANCELLED = "cancelled"
-
 # Định nghĩa State Machine: {Trạng_thái_hiện_tại: [Danh_sách_trạng_thái_được_phép_chuyển_tới]}
 ALLOWED_TRANSITIONS = {
-    OrderStatus.PENDING: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
-    OrderStatus.PROCESSING: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
-    OrderStatus.SHIPPED: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
-    OrderStatus.DELIVERED: [], # Trạng thái kết thúc (Terminal state), không được đi đâu nữa
-    OrderStatus.CANCELLED: []  # Trạng thái kết thúc
+    OrderStatusEnum.PENDING: [OrderStatusEnum.PROCESSING, OrderStatusEnum.CANCELLED],
+    OrderStatusEnum.PROCESSING: [OrderStatusEnum.SHIPPED, OrderStatusEnum.CANCELLED],
+    OrderStatusEnum.SHIPPED: [OrderStatusEnum.DELIVERED, OrderStatusEnum.CANCELLED],
+    OrderStatusEnum.DELIVERED: [], # Trạng thái kết thúc (Terminal state), không được đi đâu nữa
+    OrderStatusEnum.CANCELLED: []  # Trạng thái kết thúc
 }
 
 def create_order(db: Session, user_id: UUID, order_create: OrderCreate) -> Order:
