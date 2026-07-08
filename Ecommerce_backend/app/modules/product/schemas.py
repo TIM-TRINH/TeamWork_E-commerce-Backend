@@ -22,6 +22,18 @@ class ProductUpdate(BaseModel):
     stock: Optional[int] = Field(None, ge=0)
     # ... (các trường khác)
 
+class CategoryBase(BaseModel):
+    name: str = Field(..., max_length=255)
+    slug: str = Field(..., max_length=255)
+    parent_id: Optional[UUID] = None
+
+class CategoryCreate(CategoryBase):
+    pass
+
+class CategoryResponse(CategoryBase):
+    category_id: UUID
+    created_at: datetime
+
 # 2. Schema cho Response trả về Client
 class ProductResponse(ProductBase):
     product_id: UUID
@@ -42,3 +54,7 @@ class ProductQueryParams(BaseModel):
     sort: Optional[str] = Field(None, pattern="^(price_asc|price_desc|newest|popular)$")
     min_price: Optional[int] = Field(None, ge=0)
     max_price: Optional[int] = None
+
+
+class ProductSearchParams(ProductQueryParams):
+    q: str = Field(..., min_length=2, description="Từ khóa tìm kiếm")

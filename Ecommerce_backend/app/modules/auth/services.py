@@ -31,7 +31,10 @@ def register_user(db: Session, user_create: UserCreate) -> User:
     db.add(user)
     db.commit()
     db.refresh(user)
+    print("PASSWORD RAW:", user_create.password)
+    print("PASSWORD LENGTH:", len(user_create.password.encode("utf-8")))
     return user
+    
 
 def authenticate_user(db: Session, email: str, password: str) -> User:
     user = get_user_by_email(db, email)
@@ -43,15 +46,8 @@ def authenticate_user(db: Session, email: str, password: str) -> User:
         )
     return user
 
-def get_user_by_id(db: Session, user_id: UUID) -> User: 
-    user = db.query(User).filter(User.user_id == user_id).first() 
-    if not user:
-        raise BusinessRuleException(
-            message="User not found",
-            error_code="USER_NOT_FOUND",
-            status_code=status.HTTP_404_NOT_FOUND # Không tìm thấy tài nguyên
-        )
-    return user
+def get_user_by_id(db: Session, user_id: UUID) -> User:
+    return db.query(User).filter(User.user_id == user_id).first()
 
 def refresh_access_token(db: Session, refresh_token: str) -> dict:
     """
@@ -71,7 +67,7 @@ def refresh_access_token(db: Session, refresh_token: str) -> dict:
     
     # 3. Chuẩn bị lại Payload chuẩn
     token_payload = {
-        "user_id": str(user.user_id),
+        "sub": str(user.user_id),
         "email": user.email,
         "role": user.role
     }

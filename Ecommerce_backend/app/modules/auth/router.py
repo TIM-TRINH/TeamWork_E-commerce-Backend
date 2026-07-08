@@ -31,7 +31,7 @@ def login(
     
     # 2. Chuẩn bị payload (Best Practice: Dùng key 'sub' thay vì 'user_id' cho chuẩn JWT)
     token_payload = {
-        "sub": str(user.id), # Đảm bảo truy cập đúng tên cột ID trong model của bạn
+        "sub": str(user.user_id), # 'sub' (subject) is the standard claim for user ID
         "email": user.email,
         "role": user.role
     }

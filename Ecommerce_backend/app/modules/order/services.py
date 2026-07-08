@@ -49,7 +49,7 @@ def create_order(db: Session, user_id: UUID, order_create: OrderCreate) -> Order
             
             # 5. Lưu chi tiết đơn hàng
             order_item = OrderItem(
-                order_id=order.id, # id đã lấy được nhờ db.flush() ở trên
+                order_id=order.order_id,
                 product_id=product.product_id,
                 quantity=item.quantity,
                 price_at_purchase=product.price
@@ -70,7 +70,7 @@ def get_orders(db: Session, user_id: UUID) -> List[Order]:
     return db.query(Order).filter(Order.user_id == user_id).order_by(Order.created_at.desc()).all()
 
 def get_order_by_id(db: Session, order_id: UUID) -> Order:
-    order = db.query(Order).filter(Order.id == order_id).first()
+    order = db.query(Order).filter(Order.order_id == order_id).first()
     if not order:
         raise BusinessRuleException("Order not found", "ORDER_NOT_FOUND", 404)
     return order

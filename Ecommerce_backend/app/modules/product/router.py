@@ -15,6 +15,16 @@ router = APIRouter(
     responses={404: {"description": "Product not found"}},
 )
 
+@router.post("/categories", response_model=schemas.CategoryResponse, status_code=status.HTTP_201_CREATED)
+def create_category(
+    category_in: schemas.CategoryCreate,
+    db: Session = Depends(get_db_session),
+    current_admin = Depends(get_current_admin)
+):
+    """Tạo danh mục mới (Chỉ Admin)."""
+    return services.create_category(db=db, category_create=category_in)
+
+
 @router.post("/", response_model=schemas.ProductResponse, status_code=status.HTTP_201_CREATED)
 def create_product(
     product_in: schemas.ProductCreate,
@@ -28,15 +38,29 @@ def create_product(
 # LƯU Ý BẮT BUỘC: Route tĩnh (/search) PHẢI nằm TRƯỚC route có param động (/{product_id})
 @router.get("/search", response_model=List[schemas.ProductResponse])
 def search_products(
-    q: str = Query(..., min_length=2, description="Từ khóa tìm kiếm"),
+    params: schemas.ProductQueryParams = Depends(),
     db: Session = Depends(get_db_session)
 ):
     """
-    Tìm kiếm Full-text bằng Typesense/Elasticsearch (WBS Task 17).
+    Tìm kiếm sản phẩm theo từ khóa, danh mục, giá và sắp xếp.
     Public endpoint.
     """
-    # TODO: Gọi service tích hợp Search Engine sau
-    return []
+    if not params.q:
+        raise BusinessRuleException(
+            message="Tham số q là bắt buộc cho tìm kiếm.",
+            error_code="SEARCH_QUERY_REQUIRED",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    return services.search_products(
+        db=db,
+        q=params.q,
+        category_id=params.category_id,
+        min_price=params.min_price,
+        max_price=params.max_price,
+        sort=params.sort,
+        limit=params.limit,
+    )
 
 
 @router.get("/", response_model=List[schemas.ProductResponse])
