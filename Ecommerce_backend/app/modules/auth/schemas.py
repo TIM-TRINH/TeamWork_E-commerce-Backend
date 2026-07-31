@@ -20,6 +20,9 @@ class UserCreate(UserBase):
     @classmethod
     def validate_password_strength(cls, v: str) -> str:
         """Kiểm tra độ mạnh của mật khẩu một cách tường minh."""
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError("Mật khẩu không được vượt quá 72 bytes.")
+
         if not any(char.isupper() for char in v):
             raise ValueError("Mật khẩu phải chứa ít nhất 1 chữ cái in hoa.")
         
@@ -47,3 +50,7 @@ class TokenResponse(BaseModel):
 # Schema cho Request đổi token mới bằng refresh token
 class RefreshTokenRequest(BaseModel):
     refresh_token: str = Field(..., description="Refresh token hợp lệ để đổi token mới")
+
+
+class MessageResponse(BaseModel):
+    message: str

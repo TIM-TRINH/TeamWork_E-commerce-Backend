@@ -1,7 +1,6 @@
 from fastapi import Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from uuid import UUID
 
 from app.db.database import get_db_session
 from app.modules.auth import services, models
@@ -17,9 +16,8 @@ def get_current_user(
 ) -> models.User:  # [QUAN TRỌNG]: Bổ sung type hint trả về
     """Dependency lấy thông tin User hiện tại từ Token."""
     
-    # 1. Nhận trực tiếp đối tượng UUID từ security
-    user_id: UUID | None = security.verify_token(token)
-    if not user_id:
+    claims = security.decode_token(token, expected_type="access")
+    if not claims:
         raise BusinessRuleException(
             message="Token không hợp lệ hoặc đã hết hạn", 
             error_code="INVALID_TOKEN",
@@ -27,7 +25,7 @@ def get_current_user(
         )
     
     # 2. Truyền thẳng user_id (đã là UUID) vào Service
-    user = services.get_user_by_id(db, user_id)
+    user = services.get_user_by_id(db, claims.user_id)
     if not user:
         raise BusinessRuleException(
             message="Tài khoản không tồn tại", 

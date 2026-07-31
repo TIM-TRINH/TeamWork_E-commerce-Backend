@@ -11,13 +11,16 @@ Hướng dẫn này giải thích cấu trúc project, chức năng từng file,
 
 ```
 ecommerce_backend/
-├── requirements.txt          # Danh sách tất cả dependencies (FastAPI, SQLAlchemy, JWT, Redis)
+├── requirements.txt          # Runtime dependencies cho production
+├── requirements-dev.txt      # Test và hot-reload dependencies
 ├── .env                      # ⚠️ LOCAL ONLY - Cấu hình DATABASE_URL, SECRET_KEY, REDIS_URL (không commit)
-├── .env.example              # Mẫu .env để devs copy
+├── env.example               # Mẫu .env để devs copy
 ├── .gitignore                # Loại trừ __pycache__, .env, venv, logs từ Git
+├── .dockerignore             # Giảm build context và loại trừ secrets
 ├── alembic.ini               # Cấu hình Alembic migrations
-├── Dockerfile                # Build image Docker cho production
-├── docker-compose.yml        # Khởi động PostgreSQL, Redis, App services
+├── Dockerfile                # Multi-stage, non-root production image
+├── docker-compose.yml        # Production base: DB, Redis, migration, app
+├── docker-compose.override.yml # Bind mount và hot reload cho development
 ├── ReadMe.md                 # Hướng dẫn này
 ```
 
@@ -36,15 +39,17 @@ ecommerce_backend/
 
 | File | Chức Năng |
 |------|----------|
-| **config.py** | Load settings từ `.env` bằng pydantic-settings (PROJECT_NAME, DATABASE_URL, REDIS_URL, SECRET_KEY) |
+| **config.py** | Load và validate logging, token, pool, Redis settings từ environment |
 | **exceptions.py** | Định nghĩa BusinessRuleException & global handler trả về JSON {error_code, message} |
-| **security.py** | ⚠️ CẦN IMPLEMENT — Hash password (bcrypt), tạo JWT token, verify token |
+| **logging.py** | Cấu hình stdout logging; DEBUG ở development, INFO ở production |
+| **security.py** | Hash password bằng bcrypt và JWT có `token_type`, `jti`, `session_id` |
 
 ### app/db/ — Database Layer
 
 | File | Chức Năng |
 |------|----------|
-| **database.py** | Tạo SQLAlchemy engine từ DATABASE_URL, SessionLocal session factory, get_db_session() dependency |
+| **database.py** | Tạo QueuePool hoặc NullPool từ environment và cung cấp DB session |
+| **redis.py** | Redis client dùng cho refresh-token sessions và readiness |
 | **base_class.py** | Khai báo SQLAlchemy declarative_base() — cha mẹ của tất cả models |
 
 ### app/modules/ — Feature Modules (Chứa Logic Business)
@@ -73,7 +78,7 @@ Client Request
 - `models.py` → `User` model (id, email, password_hash, created_at)
 - `schemas.py` → `LoginRequest`, `TokenResponse`, `UserResponse`
 - `services.py` → `authenticate_user()`, `create_access_token()`, `hash_password()`
-- `router.py` → `/login`, `/register`, `/me`
+- `router.py` → `/login`, `/register`, `/refresh-token`, `/logout`, `/me`
 
 **Module Product:**
 - `models.py` → `Product` model (id, name, price, description, category, stock)
@@ -101,7 +106,7 @@ Client Request
 ### 1️⃣ Khởi Động Server
 
 ```
-docker-compose up --build
+docker compose up --build
     ↓
 PostgreSQL (port 5432) + Redis (port 6379) ready
     ↓
@@ -123,13 +128,13 @@ router.py: validate email & password (schemas)
     ↓
 services.py: hash_password(password) compare với DB
     ↓
-services.py: create_access_token(user_id)
+services.py: tạo Redis refresh session và cặp access/refresh token
     ↓
-Response: {"access_token": "jwt_token", "token_type": "bearer"}
+Response: {"access_token": "...", "refresh_token": "...", "token_type": "bearer"}
     ↓
 Client: GET /v1/products (header: Authorization: Bearer jwt_token)
     ↓
-middleware/security: verify_token(jwt_token) → extract user_id
+dependencies.py: decode token với expected_type="access" → extract user_id
     ↓
 Endpoint executes as authenticated user
 ```
@@ -186,21 +191,27 @@ cd ecommerce_backend
 
 **Windows:**
 ```powershell
-Copy-Item .env.example .env
+Copy-Item env.example .env
 ```
 
 **Linux/macOS:**
 ```bash
-cp .env.example .env
+cp env.example .env
 ```
 
 Mở `.env` và điền giá trị:
 
 ```env
 PROJECT_NAME="E-Commerce API"
-DATABASE_URL="postgresql://user:pass@db:5432/ecommerce_db"
+DEBUG=False
+CORS_ORIGINS=["http://localhost:3000","http://localhost:5173"]
+POSTGRES_USER=user
+POSTGRES_PASSWORD=change-me
+POSTGRES_DB=ecommerce_db
+DATABASE_URL="postgresql://user:change-me@db:5432/ecommerce_db"
 REDIS_URL="redis://redis:6379/0"
 SECRET_KEY="your-secure-32-byte-secret-key"
+DB_POOL_MODE=queue
 ```
 
 **Cách sinh SECRET_KEY an toàn:**
@@ -231,14 +242,14 @@ docker ps
 ```powershell
 python -m venv venv
 .\venv\Scripts\Activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 **Linux/macOS:**
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 ### Step 4: Database Migrations (Alembic)
@@ -299,7 +310,7 @@ Response:
 - [ ] **Docker & Deployment**
   - [ ] docker-compose.yml có app service
   - [ ] DATABASE_URL, REDIS_URL, SECRET_KEY cấu hình đúng
-  - [ ] `docker-compose up --build` chạy toàn bộ stack
+    - [ ] `docker compose up --build` chạy toàn bộ stack
   - [ ] Kiểm tra health: `GET /v1/health`
 
 - [ ] **Database & Migrations**
@@ -318,25 +329,62 @@ Response:
   - [ ] Không commit `.env`
   - [ ] Xử lý lỗi dùng BusinessRuleException
   - [ ] Tất cả endpoints return JSON spec (error_code, message)
-  - [ ] Logging (tùy chọn)
+    - [ ] Logging không chứa password, token hoặc secret
 
 ---
 
 ## 🐳 Run with Docker Compose
 
+Development (tự động dùng `docker-compose.override.yml`):
+
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
-Các services sẽ start:
-- PostgreSQL (port 5432)
-- Redis (port 6379)
-- FastAPI App (port 8000)
+Production base, không bind mount hoặc reload:
+
+```bash
+docker compose -f docker-compose.yml up --build
+```
+
+PostgreSQL và Redis chỉ publish host ports trong development override. Service
+`migrate` chạy `alembic upgrade head` một lần; app chỉ start sau khi DB/Redis
+healthy và migration hoàn tất.
 
 Test:
 ```bash
 curl http://localhost:8000/v1/health
+curl http://localhost:8000/v1/ready
 ```
+
+`/v1/health` là liveness không phụ thuộc external services. `/v1/ready` kiểm tra
+PostgreSQL và Redis, trả HTTP 503 khi app chưa sẵn sàng nhận traffic.
+
+### Logging
+
+- `DEBUG=True`: log level DEBUG.
+- `DEBUG=False`: log level INFO; warning/error vẫn được ghi.
+- Password, JWT và secret không được ghi log ở bất kỳ level nào.
+
+### Refresh-token security
+
+Mỗi lần login tạo một Redis session riêng cho thiết bị. Refresh token có
+`session_id` và `jti`, chỉ dùng một lần. Rotation được thực hiện atomically bằng
+Redis Lua script. Nếu token cũ bị replay, toàn bộ session đó bị revoke; session
+trên thiết bị khác không bị ảnh hưởng. `/v1/auth/logout` revoke session hiện tại.
+Redis session state không persist trong Compose: Redis restart sẽ fail closed bằng
+cách buộc tất cả thiết bị đăng nhập lại, tránh khôi phục một JTI cũ đã bị rotate.
+
+### Database pool
+
+Container dùng `DB_POOL_MODE=queue`; serverless hoặc external pooler có thể chọn
+`DB_POOL_MODE=null`. Connection ceiling phải được tính trước khi scale:
+
+```text
+replicas × workers × (DB_POOL_SIZE + DB_MAX_OVERFLOW)
+```
+
+Giữ một phần PostgreSQL connection budget cho migration, admin và service khác.
 
 ---
 
@@ -369,10 +417,11 @@ alembic history
 ## ⚠️ Important Notes
 
 1. **SECRET_KEY**: KHÔNG để rỗng. Sinh bằng `python -c "import secrets; print(secrets.token_urlsafe(32))"`
-2. **DATABASE_URL**: Khi dùng docker-compose, hostname là `db` (tên service)
+2. **DATABASE_URL**: Khi dùng Docker Compose, hostname là `db`; chạy app trực tiếp thì dùng `localhost`
 3. **.env**: Không commit. Giữ local
 4. **Migrations**: Sau mỗi khi modify models, chạy `alembic revision --autogenerate`
-5. **Token Authorization**: Format `Authorization: Bearer <token>`
+5. **Token Authorization**: Chỉ access token dùng format `Authorization: Bearer <token>`
+6. **Image digests**: Docker images được pin digest; cập nhật digest định kỳ cùng security patches
 
 ---
 
@@ -381,10 +430,11 @@ alembic history
 | Problem | Solution |
 |---------|----------|
 | `ModuleNotFoundError` | Kiểm tra `PYTHONPATH` hoặc activate venv |
-| `DATABASE_URL not found` | Tạo `.env` từ `.env.example` |
+| `DATABASE_URL not found` | Tạo `.env` từ `env.example` |
 | `alembic revision fails` | Import models trong `alembic/env.py` |
-| `Connection refused` | Đảm bảo PostgreSQL/Redis running (docker-compose up) |
+| `Connection refused` | Đảm bảo PostgreSQL/Redis running (`docker compose up`) |
 | `JWT verify fails` | Kiểm tra SECRET_KEY khớp, token chưa expire |
+| Refresh trả `AUTH_STORE_UNAVAILABLE` | Kiểm tra Redis health và `REDIS_URL` |
 
 ---
 

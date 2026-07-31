@@ -1,47 +1,96 @@
-# docker-compose.yml
-version: '3.8'
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  init: true
+  security_opt:
+    - no-new-privileges:true
 
 services:
   db:
-    image: postgres:15-alpine
-    container_name: ecommerce_db
-    restart: always
+    <<: *service-defaults
+    image: postgres:15-alpine@sha256:3d0f7584ed7d04e27fa050d6683a74746608faf21f202be78460d679cc56461f
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: pass
-      POSTGRES_DB: ecommerce_db
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
     volumes:
-      - postgres_data:/var/lib/postgresql/data # Lưu trữ dữ liệu vật lý
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    cpus: ${DB_CPUS:-1.0}
+    mem_limit: ${DB_MEMORY_LIMIT:-1g}
+    pids_limit: ${DB_PIDS_LIMIT:-200}
 
   redis:
-    image: redis:7-alpine
-    container_name: ecommerce_redis
-    restart: always
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
+    <<: *service-defaults
+    image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    cpus: ${REDIS_CPUS:-0.5}
+    mem_limit: ${REDIS_MEMORY_LIMIT:-256m}
+    pids_limit: ${REDIS_PIDS_LIMIT:-100}
 
-  app:
+  migrate:
+    image: ecommerce-backend:${IMAGE_TAG:-local}
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ecommerce_app
-    restart: unless-stopped
+      target: runtime
+    env_file:
+      - .env
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cpus: ${MIGRATE_CPUS:-0.5}
+    mem_limit: ${MIGRATE_MEMORY_LIMIT:-256m}
+    pids_limit: ${MIGRATE_PIDS_LIMIT:-100}
+
+  app:
+    <<: *service-defaults
+    image: ecommerce-backend:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
     env_file:
       - .env
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
-      - "8000:8000"
-    volumes:
-      - ./:/app
-    command: >
-      sh -c "uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+      - "${APP_HOST:-127.0.0.1}:${APP_PORT:-8000}:8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/ready', timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+    cpus: ${APP_CPUS:-1.0}
+    mem_limit: ${APP_MEMORY_LIMIT:-512m}
+    pids_limit: ${APP_PIDS_LIMIT:-200}
 
 volumes:
   postgres_data:
-  redis_data:

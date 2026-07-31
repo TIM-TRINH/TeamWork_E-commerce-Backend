@@ -1,0 +1,19 @@
+services:
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  app:
+    image: ecommerce-backend-dev:${IMAGE_TAG:-local}
+    build:
+      target: development
+    read_only: false
+    volumes:
+      - type: bind
+        source: .
+        target: /app
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
